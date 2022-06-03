@@ -1,0 +1,6 @@
+homepage: "https://piwik.pro/"
+documentation: "https://help.piwik.pro/"
+versions:
+  # Initial version
+  - sha: a133ca6a945aed00238072b4e8790cbddbd30adf
+    changeNotes: Initial release.
