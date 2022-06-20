@@ -1,6 +1,9 @@
 homepage: "https://piwik.pro/"
 documentation: "https://help.piwik.pro/"
 versions:
+  # Second version
+  - sha: 15d67072b0d50977d08901bf1894ac4c4bd7b3cf
+    changeNotes: Fixed the custom endpoint option which wasn't properly displayed.
   # Initial version
   - sha: a133ca6a945aed00238072b4e8790cbddbd30adf
     changeNotes: Initial release.
