@@ -84,7 +84,7 @@ ___TEMPLATE_PARAMETERS___
         "simpleValueType": true,
         "enablingConditions": [
           {
-            "paramName": "useDefaultPaths",
+            "paramName": "useDefaultEndpoint",
             "paramValue": false,
             "type": "EQUALS"
           }
@@ -328,6 +328,5 @@ scenarios: []
 
 ___NOTES___
 
-Created on 02/06/2022, 20:46:09
-
+Created on 20/06/2022, 13:15:48
 
