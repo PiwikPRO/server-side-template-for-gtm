@@ -153,6 +153,9 @@ const getAllEventData = require('getAllEventData');
 const sendHttpGet = require('sendHttpGet');
 const encodeUri = require('encodeUri');
 const logToConsole = require('logToConsole');
+const generateRandom = require('generateRandom');
+const encodeUriComponent = require('encodeUriComponent');
+const JSON = require('JSON');
 
 // Get the name of the tagging client used
 const clientName = getClientName();
@@ -198,7 +201,10 @@ const buildRequest = (eventData) => {
         'url=' + eventData.page_location + '&' +
         'cip=' + eventData.ip_override + '&' +
         'ua=' + eventData.user_agent + '&' +
-        'res=' + eventData.screen_resolution;
+        'lang=' + eventData.language||"" + '&' +
+        'rand=' + generateRandom(100000, 999999) + '&' +
+        'urlref=' + eventData.page_referrer||"" + '&' +
+        'res=' + eventData.screen_resolution||"";
   
   if (data.anonymousTracking == true) {
     requestPath += '&uia=1';
@@ -208,6 +214,49 @@ const buildRequest = (eventData) => {
     const dimensionParams = parseCustomDimensions(eventData, data.customDimensionMappings);
     requestPath += dimensionParams;
   }
+    
+  // is it a transaction?
+  var ti = eventData.transaction_id;
+  if (ti) {
+    var rv = (eventData.revenue) || eventData.value || 0; 
+    var tx = eventData.tax || 0; 
+    var sh = eventData.shipping || 0; 
+    var dt = eventData.discount_amount || eventData.discount_amount || 0; 
+    var vg = eventData.value_of_goods || (rv + dt - tx - sh) || ""; 
+
+    requestPath += '&idgoal=0&ec_id='+ti+
+                   '&revenue='+rv+
+                   '&ec_st='+vg+
+                   '&ec_tx='+tx+
+                   '&ec_sh='+sh+
+                   '&ec_dt='+dt;
+  
+    // items
+    var items = eventData.items;
+    if (items && typeof(items === "object") && items.length > 0) {
+      var ecItemArray = [];
+      for (var i=0;i<items.length;i++) {
+        var itCat, it = items[i];
+        if (it.item_category2 && it.item_category2 != "") {
+          var itCatArray = [it.item_category, it.item_category2];
+          if (it.item_category3) itCatArray.push(it.item_category3);
+          if (it.item_category4) itCatArray.push(it.item_category4);
+          if (it.item_category5) itCatArray.push(it.item_category5);
+          itCat = JSON.stringify(itCatArray);
+        } else {
+          itCat = it.item_category;
+        }  
+    
+        ecItemArray.push([it.item_id, 
+                          it.item_name, 
+                          itCat, 
+                          it.price, 
+                          it.quantity
+                         ]);
+      }  
+      requestPath += '&ec_items='+ encodeUriComponent(JSON.stringify(ecItemArray));
+    }  
+  } 
   
   // Add additional parameters specific to particular event types
   switch (eventType) {
@@ -220,7 +269,8 @@ const buildRequest = (eventData) => {
       return requestPath + '&' +
         'e_c=' + eventData.event_category + '&' +
         'e_a=' + eventData.event_action + '&' +
-        'e_n=' + eventData.event_label;
+        'e_n=' + eventData.event_label||"" + '&' +
+        'e_v=' + eventData.event_value||"";
   }
 };
 
