@@ -154,7 +154,6 @@ const sendHttpGet = require('sendHttpGet');
 const encodeUri = require('encodeUri');
 const logToConsole = require('logToConsole');
 const generateRandom = require('generateRandom');
-const encodeUriComponent = require('encodeUriComponent');
 const JSON = require('JSON');
 
 // Get the name of the tagging client used
@@ -254,8 +253,11 @@ const buildRequest = (eventData) => {
                           it.quantity
                          ]);
       }  
-      requestPath += '&ec_items='+ encodeUriComponent(JSON.stringify(ecItemArray));
-    }  
+      requestPath += '&ec_items='+ JSON.stringify(ecItemArray);
+    } 
+    
+    //no additional parameters needed for ecommerce hits, return here
+    return requestPath; 
   } 
   
   // Add additional parameters specific to particular event types
@@ -264,13 +266,20 @@ const buildRequest = (eventData) => {
       return requestPath + '&' +
         'action_name=' + eventData.page_title;
   
-    // Custom events the same event type as the event action parameter
+    // Custom events the same event type as the event action parameter (Universal Analytics...)
     case eventData.event_action:
       return requestPath + '&' +
         'e_c=' + eventData.event_category + '&' +
         'e_a=' + eventData.event_action + '&' +
         'e_n=' + eventData.event_label||"" + '&' +
         'e_v=' + eventData.event_value||"";
+      
+    //everything else is a "regular" event (GA4 / other)
+    default: 
+      var cat = eventData.event_category ? eventData.event_category : "general";
+      return requestPath + '&' +
+        'e_c=' + cat + '&' +
+        'e_a=' + eventData.event_name;
   }
 };
 
