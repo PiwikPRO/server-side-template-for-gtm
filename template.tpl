@@ -162,6 +162,44 @@ const clientName = getClientName();
 // Read event data
 const eventData = getAllEventData();
 
+// Get default event category for standard events without event_category attribute
+const getEventCategory = (eventType) => {
+  const eec = ["add_payment_info", "add_shipping_info", "add_to_cart", "add_to_wishlist", 
+       "begin_checkout", "refund", "remove_from_cart", "select_item", 
+       "select_promotion", "view_cart", "view_item", 
+       "view_item_list", "view_promotion"]; 
+  if (eec.indexOf(eventType) >= 0) return "ecommerce"; 
+  else return "general";
+};
+
+// Get default event label from (first) item name for ecommere events 
+const getEventLabel = (eventData) => {
+  const eec_with_item = ["add_to_cart", "add_to_wishlist", 
+       "remove_from_cart", "select_item", "view_item", "view_item_list", "view_promotion", "select_promotion"]; 
+  if ((eec_with_item.indexOf(eventData.event_name) >= 0) && eventData.items && eventData.items[0]) {
+    return eventData.items[0].item_name||eventData.items[0].item_id; 
+  } else return "";
+};
+
+// Map ecommerce items for transaction 
+const convertItemsArray = (items) => {
+  var ecItemArray = [];
+  for (var i=0;i<items.length;i++) {
+    var itCat, it = items[i];
+    if (it.item_category2 && it.item_category2 != "") {
+      var itCatArray = [it.item_category, it.item_category2];
+      if (it.item_category3) itCatArray.push(it.item_category3);
+      if (it.item_category4) itCatArray.push(it.item_category4);
+      if (it.item_category5) itCatArray.push(it.item_category5);
+      itCat = JSON.stringify(itCatArray);
+    } else {
+      itCat = it.item_category;
+    }  
+    ecItemArray.push([it.item_id, it.item_name, itCat, it.price, it.quantity]);
+  }
+  return ecItemArray;
+};
+
 // Parse custom dimensions from the dimension event object
 // Builds a string with new params for the Piwik PRO tracking request
 const parseCustomDimensions = (eventData, dimensionMappings) => {
@@ -214,7 +252,7 @@ const buildRequest = (eventData) => {
     requestPath += dimensionParams;
   }
     
-  // is it a transaction?
+  // Is it a transaction?
   var ti = eventData.transaction_id;
   if (ti) {
     var rv = (eventData.revenue) || eventData.value || 0; 
@@ -233,30 +271,11 @@ const buildRequest = (eventData) => {
     // items
     var items = eventData.items;
     if (items && typeof(items === "object") && items.length > 0) {
-      var ecItemArray = [];
-      for (var i=0;i<items.length;i++) {
-        var itCat, it = items[i];
-        if (it.item_category2 && it.item_category2 != "") {
-          var itCatArray = [it.item_category, it.item_category2];
-          if (it.item_category3) itCatArray.push(it.item_category3);
-          if (it.item_category4) itCatArray.push(it.item_category4);
-          if (it.item_category5) itCatArray.push(it.item_category5);
-          itCat = JSON.stringify(itCatArray);
-        } else {
-          itCat = it.item_category;
-        }  
-    
-        ecItemArray.push([it.item_id, 
-                          it.item_name, 
-                          itCat, 
-                          it.price, 
-                          it.quantity
-                         ]);
-      }  
+      var ecItemArray = convertItemsArray(items);
       requestPath += '&ec_items='+ JSON.stringify(ecItemArray);
     } 
     
-    //no additional parameters needed for ecommerce hits, return here
+    //No additional parameters needed for ecommerce hits, return here
     return requestPath; 
   } 
   
@@ -271,15 +290,16 @@ const buildRequest = (eventData) => {
       return requestPath + '&' +
         'e_c=' + eventData.event_category + '&' +
         'e_a=' + eventData.event_action + '&' +
-        'e_n=' + eventData.event_label||"" + '&' +
-        'e_v=' + eventData.event_value||"";
+        'e_n=' + (eventData.event_label||"") + '&' +
+        'e_v=' + (eventData.event_value||"");
       
     //everything else is a "regular" event (GA4 / other)
     default: 
-      var cat = eventData.event_category ? eventData.event_category : "general";
+      var cat = eventData.event_category ? eventData.event_category : getEventCategory(eventType);
       return requestPath + '&' +
         'e_c=' + cat + '&' +
-        'e_a=' + eventData.event_name;
+        'e_n=' + getEventLabel(eventData) +
+        'e_a=' + eventType;
   }
 };
 
