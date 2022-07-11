@@ -153,12 +153,52 @@ const getAllEventData = require('getAllEventData');
 const sendHttpGet = require('sendHttpGet');
 const encodeUri = require('encodeUri');
 const logToConsole = require('logToConsole');
+const generateRandom = require('generateRandom');
+const JSON = require('JSON');
 
 // Get the name of the tagging client used
 const clientName = getClientName();
 
 // Read event data
 const eventData = getAllEventData();
+
+// Get default event category for standard events without event_category attribute
+const getEventCategory = (eventType) => {
+  const eec = ["add_payment_info", "add_shipping_info", "add_to_cart", "add_to_wishlist", 
+       "begin_checkout", "refund", "remove_from_cart", "select_item", 
+       "select_promotion", "view_cart", "view_item", 
+       "view_item_list", "view_promotion"]; 
+  if (eec.indexOf(eventType) >= 0) return "ecommerce"; 
+  else return "general";
+};
+
+// Get default event label from (first) item name for ecommere events 
+const getEventLabel = (eventData) => {
+  const eec_with_item = ["add_to_cart", "add_to_wishlist", 
+       "remove_from_cart", "select_item", "view_item", "view_item_list", "view_promotion", "select_promotion"]; 
+  if ((eec_with_item.indexOf(eventData.event_name) >= 0) && eventData.items && eventData.items[0]) {
+    return eventData.items[0].item_name||eventData.items[0].item_id; 
+  } else return "";
+};
+
+// Map ecommerce items for transaction 
+const convertItemsArray = (items) => {
+  var ecItemArray = [];
+  for (var i=0;i<items.length;i++) {
+    var itCat, it = items[i];
+    if (it.item_category2 && it.item_category2 != "") {
+      var itCatArray = [it.item_category, it.item_category2];
+      if (it.item_category3) itCatArray.push(it.item_category3);
+      if (it.item_category4) itCatArray.push(it.item_category4);
+      if (it.item_category5) itCatArray.push(it.item_category5);
+      itCat = JSON.stringify(itCatArray);
+    } else {
+      itCat = it.item_category;
+    }  
+    ecItemArray.push([it.item_id, it.item_name, itCat, it.price, it.quantity]);
+  }
+  return ecItemArray;
+};
 
 // Parse custom dimensions from the dimension event object
 // Builds a string with new params for the Piwik PRO tracking request
@@ -198,7 +238,10 @@ const buildRequest = (eventData) => {
         'url=' + eventData.page_location + '&' +
         'cip=' + eventData.ip_override + '&' +
         'ua=' + eventData.user_agent + '&' +
-        'res=' + eventData.screen_resolution;
+        'lang=' + eventData.language||"" + '&' +
+        'rand=' + generateRandom(100000, 999999) + '&' +
+        'urlref=' + eventData.page_referrer||"" + '&' +
+        'res=' + eventData.screen_resolution||"";
   
   if (data.anonymousTracking == true) {
     requestPath += '&uia=1';
@@ -208,6 +251,33 @@ const buildRequest = (eventData) => {
     const dimensionParams = parseCustomDimensions(eventData, data.customDimensionMappings);
     requestPath += dimensionParams;
   }
+    
+  // Is it a transaction?
+  var ti = eventData.transaction_id;
+  if (ti) {
+    var rv = (eventData.revenue) || eventData.value || 0; 
+    var tx = eventData.tax || 0; 
+    var sh = eventData.shipping || 0; 
+    var dt = eventData.discount_amount || eventData.discount_amount || 0; 
+    var vg = eventData.value_of_goods || (rv + dt - tx - sh) || ""; 
+
+    requestPath += '&idgoal=0&ec_id='+ti+
+                   '&revenue='+rv+
+                   '&ec_st='+vg+
+                   '&ec_tx='+tx+
+                   '&ec_sh='+sh+
+                   '&ec_dt='+dt;
+  
+    // items
+    var items = eventData.items;
+    if (items && typeof(items === "object") && items.length > 0) {
+      var ecItemArray = convertItemsArray(items);
+      requestPath += '&ec_items='+ JSON.stringify(ecItemArray);
+    } 
+    
+    //No additional parameters needed for ecommerce hits, return here
+    return requestPath; 
+  } 
   
   // Add additional parameters specific to particular event types
   switch (eventType) {
@@ -215,12 +285,21 @@ const buildRequest = (eventData) => {
       return requestPath + '&' +
         'action_name=' + eventData.page_title;
   
-    // Custom events the same event type as the event action parameter
+    // Custom events the same event type as the event action parameter (Universal Analytics...)
     case eventData.event_action:
       return requestPath + '&' +
         'e_c=' + eventData.event_category + '&' +
         'e_a=' + eventData.event_action + '&' +
-        'e_n=' + eventData.event_label;
+        'e_n=' + (eventData.event_label||"") + '&' +
+        'e_v=' + (eventData.event_value||"");
+      
+    //everything else is a "regular" event (GA4 / other)
+    default: 
+      var cat = eventData.event_category ? eventData.event_category : getEventCategory(eventType);
+      return requestPath + '&' +
+        'e_c=' + cat + '&' +
+        'e_n=' + getEventLabel(eventData) +
+        'e_a=' + eventType;
   }
 };
 
