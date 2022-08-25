@@ -192,13 +192,15 @@ const buildRequest = (eventData) => {
   const requestEndpoint = data.useDefaultEndpoint ? 'ppms.php' : data.customEndpoint;
   
   // Add common tracking request parameters (that won't change regardless of the event type)
+  const page_referrer = eventData.hasOwnProperty('page_referrer') ? '&urlref=' + encodeUriComponent(eventData.page_referrer) : '';
   let requestPath = requestEndpoint + '?' +
         'rec=1' + '&' +
         'idsite=' + data.siteID + '&' +
         'url=' + eventData.page_location + '&' +
         'cip=' + eventData.ip_override + '&' +
         'ua=' + eventData.user_agent + '&' +
-        'res=' + eventData.screen_resolution;
+        'res=' + eventData.screen_resolution +
+        page_referrer;
   
   if (data.anonymousTracking == true) {
     requestPath += '&uia=1';
