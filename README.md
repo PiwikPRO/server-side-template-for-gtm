@@ -1,3 +1,7 @@
+> [!CAUTION]
+> Due to GA3/UA deprecation, this repository will be archived.
+> The new client and tag templates for server-side Google Tag Manager can be found ![here](https://help.piwik.pro/support/integrations/google-tag-manager-server-side-integration/).
+
 # Piwik PRO Analytics template for Google Tag Manager (server-side)
 
 Analyze the customer journey across websites and apps.
